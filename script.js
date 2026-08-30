@@ -15,6 +15,34 @@ const safeInt = (v, fallback = 0) => {
   return Number.isFinite(n) ? n : fallback;
 };
 
+/* ===== Minecraft Backgrounds ===== */
+const minecraftBackgrounds = [
+  'linear-gradient(135deg, #87CEEB 0%, #E0F6FF 100%)',
+  'linear-gradient(180deg, #1a1a1a 0%, #2d2d2d 50%, #4d4d4d 100%)',
+  'linear-gradient(135deg, #ff7f00 0%, #ffd700 50%, #87CEEB 100%)',
+  'linear-gradient(180deg, #2d5016 0%, #5fd381 50%, #87CEEB 100%)',
+  'linear-gradient(135deg, #4a4a4a 0%, #2d2d2d 100%)',
+  'linear-gradient(180deg, #87CEEB 0%, #4a90e2 100%)',
+  'linear-gradient(135deg, #ff6b6b 0%, #ffd700 50%, #87CEEB 100%)',
+  'linear-gradient(180deg, #1a1a1a 0%, #4a4a4a 100%)',
+];
+
+let currentBgIndex = 0;
+let savedBgIndex = safeInt(localStorage.getItem('minecraft_saved_bg'), -1);
+let audioEnabled = localStorage.getItem('minecraft_audio_enabled') !== 'false';
+
+function getRandomMinecraftBg() {
+  currentBgIndex = Math.floor(Math.random() * minecraftBackgrounds.length);
+  return minecraftBackgrounds[currentBgIndex];
+}
+
+function applyBackground(index = -1) {
+  const bgToApply = index >= 0 ? minecraftBackgrounds[index] : getRandomMinecraftBg();
+  document.body.style.setProperty('--bg-image', `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="%23000" width="100" height="100"/></svg>')`);
+  document.body.style.background = bgToApply;
+  document.body.style.backgroundAttachment = 'fixed';
+}
+
 /* ===== App state ===== */
 let selectedFactors = [];
 let currentScore = safeInt(localStorage.getItem('math_quiz_score'), 0);
@@ -90,6 +118,9 @@ function setTheme(themeName) {
   } else {
     docHtml.setAttribute('data-theme', themeName);
     localStorage.setItem('math_quiz_theme', themeName);
+    if (themeName === 'minecraft') {
+      applyBackground(savedBgIndex >= 0 ? savedBgIndex : -1);
+    }
   }
 }
 // Initialize theme
@@ -103,16 +134,61 @@ window.addEventListener('click', (event) => {
   if (!event.target.closest('.header-menu')) {
     themeDropdown.classList.remove('show');
     menuButton.setAttribute('aria-expanded', 'false');
+    bgDropdown.classList.remove('show');
+    bgToggleBtn.setAttribute('aria-expanded', 'false');
   }
 });
 
+/* ===== Minecraft Background Selector ===== */
+const bgToggleBtn = el('bg-toggle-btn');
+const bgDropdown = el('bg-dropdown');
+
+if (bgToggleBtn && bgDropdown) {
+  bgToggleBtn.addEventListener('click', () => {
+    const shown = bgDropdown.classList.toggle('show');
+    bgToggleBtn.setAttribute('aria-expanded', shown ? 'true' : 'false');
+  });
+
+  // Populate background options
+  minecraftBackgrounds.forEach((bg, index) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.innerText = `🎨 Background ${index + 1}`;
+    btn.addEventListener('click', () => {
+      applyBackground(index);
+      savedBgIndex = index;
+      localStorage.setItem('minecraft_saved_bg', index);
+      bgDropdown.classList.remove('show');
+      bgToggleBtn.setAttribute('aria-expanded', 'false');
+      playMinecraftSound('select');
+    });
+    bgDropdown.appendChild(btn);
+  });
+
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'button';
+  saveBtn.style.borderTop = '1px solid var(--tile-bg)';
+  saveBtn.style.fontWeight = 'bold';
+  saveBtn.innerText = `💾 Save Current`;
+  saveBtn.addEventListener('click', () => {
+    localStorage.setItem('minecraft_saved_bg', currentBgIndex);
+    savedBgIndex = currentBgIndex;
+    alert('✅ Background saved!');
+    bgDropdown.classList.remove('show');
+    bgToggleBtn.setAttribute('aria-expanded', 'false');
+  });
+  bgDropdown.appendChild(saveBtn);
+}
+
 /* ===== Audio & haptics ===== */
 let audioCtx = null;
+
 function initAudio() {
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   } catch (e) { audioCtx = null; }
 }
+
 function playSound(type) {
   initAudio();
   if (!audioCtx) return;
@@ -128,6 +204,53 @@ function playSound(type) {
   osc.start();
   setTimeout(() => { osc.stop(); }, 120);
 }
+
+function playMinecraftSound(type) {
+  if (!audioEnabled) return;
+  initAudio();
+  if (!audioCtx) return;
+  
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  gain.gain.value = 0.05;
+  osc.type = 'square';
+
+  if (type === 'correct') {
+    // Minecraft "ding" sound
+    osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+    osc.frequency.setValueAtTime(1000, audioCtx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0, audioCtx.currentTime + 0.2);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.2);
+  } else if (type === 'wrong') {
+    // Minecraft "hurt" sound
+    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+    osc.frequency.setValueAtTime(200, audioCtx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0, audioCtx.currentTime + 0.15);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.15);
+  } else if (type === 'select') {
+    // Minecraft "pop" sound
+    osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0, audioCtx.currentTime + 0.1);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.1);
+  } else if (type === 'bonus') {
+    // Minecraft "level up" sound
+    osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+    osc.frequency.setValueAtTime(1400, audioCtx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0, audioCtx.currentTime + 0.3);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.3);
+  }
+}
+
 function triggerHaptic(type) {
   if (!('vibrate' in navigator)) return;
   if (type === 'success') navigator.vibrate(40);
@@ -141,7 +264,6 @@ function spawnParticle(text, color) {
   p.className = 'particle';
   p.innerText = text;
   p.style.color = color;
-  // put near center
   p.style.left = (container.clientWidth / 2 - 10) + 'px';
   p.style.top = (container.clientHeight / 2 - 10) + 'px';
   container.appendChild(p);
@@ -167,6 +289,7 @@ function toggleFactor(tile, i) {
   tile.setAttribute('aria-pressed', (!pressed).toString());
   if (pressed) { selectedFactors = selectedFactors.filter(n => n !== i); }
   else { selectedFactors.push(i); }
+  playMinecraftSound('select');
 }
 
 /* ===== Quiz flow ===== */
@@ -203,6 +326,12 @@ function generateQuestion() {
   usedHint = false;
   el('hint-button').disabled = false;
 
+  // Change background for each question in Minecraft mode
+  const docHtml = document.documentElement;
+  if (docHtml.getAttribute('data-theme') === 'minecraft') {
+    applyBackground(-1);
+  }
+
   const useRetest = (retestQueue.length > 0) && (Math.random() > 0.4 || normalQuestionsPool.length === 0);
   if (useRetest) {
     const problemItem = retestQueue.shift();
@@ -236,6 +365,7 @@ function revealHint() {
   usedHint = true;
   el('hint-button').disabled = true;
   triggerHaptic('hint');
+  playMinecraftSound('select');
   // Simple hint: show one factor and indicate strategy
   el('hint-display').innerText = `Hint: break ${currentF1}×${currentF2} into ${currentF1}×(${currentF2}) or (${currentF1}×${Math.ceil(currentF2/2)})×2`;
   // Deduct 1 point if available
@@ -260,17 +390,17 @@ function submitAnswer() {
       feedbackEl.innerText = "✅ Correct with Hint! +1 Point";
       feedbackEl.style.color = "var(--success)";
       pointsEarned = 1;
-      playSound('correct');
+      playMinecraftSound('correct');
     } else if (timeTaken <= 4.0) {
       feedbackEl.innerText = "⚡ Lightning Fast! +4 Points";
       feedbackEl.style.color = "var(--warning)";
       pointsEarned = 4;
-      playSound('bonus');
+      playMinecraftSound('bonus');
     } else {
       feedbackEl.innerText = "✅ Correct! +2 Points";
       feedbackEl.style.color = "var(--success)";
       pointsEarned = 2;
-      playSound('correct');
+      playMinecraftSound('correct');
     }
 
     currentScore += pointsEarned;
@@ -280,7 +410,7 @@ function submitAnswer() {
     feedbackEl.innerText = `❌ Incorrect. Retest added.`;
     feedbackEl.style.color = "var(--danger)";
     displayEl.classList.add('animate-shake');
-    playSound('wrong');
+    playMinecraftSound('wrong');
     triggerHaptic('fail');
     // add to retest queue, cap size
     retestQueue.push({ f1: currentF1, f2: currentF2 });
@@ -339,6 +469,7 @@ function openAdminSettings() {
     el('cfg-n2').value = rewardShop[1].reward; el('cfg-t2').value = rewardShop[1].points;
     el('cfg-n3').value = rewardShop[2].reward; el('cfg-t3').value = rewardShop[2].points;
     el('cfg-n4').value = rewardShop[3].reward; el('cfg-t4').value = rewardShop[3].points;
+    el('cfg-audio-toggle').checked = audioEnabled;
     setActiveScreen('admin-screen');
   } else {
     alert('❌ Incorrect security access password.');
@@ -352,8 +483,10 @@ function saveAndExitAdmin() {
   rewardShop[2].reward = el('cfg-n3').value || rewardShop[2].reward; rewardShop[2].points = safeInt(el('cfg-t3').value, rewardShop[2].points);
   rewardShop[3].reward = el('cfg-n4').value || rewardShop[3].reward; rewardShop[3].points = safeInt(el('cfg-t4').value, rewardShop[3].points);
 
+  audioEnabled = el('cfg-audio-toggle').checked;
   localStorage.setItem('cfg_feedback_delay', feedbackDelayDuration);
   localStorage.setItem('cfg_shop_models', JSON.stringify(rewardShop));
+  localStorage.setItem('minecraft_audio_enabled', audioEnabled);
 
   alert('⚙️ Custom milestones and options updated successfully.');
   setActiveScreen('setup-screen');
