@@ -338,6 +338,38 @@
       z-index: 10;
     }
 
+    .handwriting-toggle {
+      position: absolute;
+      right: 10px;
+      top: 8px;
+      background: transparent;
+      border: none;
+      font-size: 18px;
+      cursor: pointer;
+    }
+
+    .handwriting-pad {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--card-bg);
+      border-radius: 12px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+      z-index: 300;
+      width: 320px;
+      max-width: calc(100% - 32px);
+      padding: 12px;
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .handwriting-pad.show { display: flex; }
+    .pad-canvas { background: white; border-radius: 8px; touch-action: none; border: 1px solid #ddd; }
+    .pad-controls { display:flex; gap:8px; justify-content: space-between; }
+    .small-btn { padding:8px 10px; border-radius:8px; border:none; cursor:pointer; }
+
     @keyframes shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-10px); } 40%, 80% { transform: translateX(10px); } }
     .animate-shake { animation: shake 0.4s ease-in-out; }
     @keyframes bounce-pop { 0% { transform: scale(0.3); opacity: 0; } 50% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); } }
@@ -382,8 +414,9 @@
         </div>
 
         <div class="problem-display" id="problem">0 × 0</div>
-        <div class="input-wrapper">
+        <div class="input-wrapper" style="position:relative;">
           <input type="number" id="answer-input" pattern="[0-9]*" inputmode="numeric" placeholder="Type answer & press Go..." aria-label="Answer input">
+          <button type="button" id="open-pad-btn" class="handwriting-toggle" title="Write your answer">✍️</button>
         </div>
 
         <div style="text-align: center;">
@@ -428,6 +461,27 @@
     </div>
   </div>
 
+  <!-- Handwriting pad (hidden by default) -->
+  <div id="handwriting-pad" class="handwriting-pad" role="dialog" aria-modal="true" aria-label="Handwriting input pad">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <strong>Write a digit</strong>
+      <span id="pad-status" style="font-size:12px; color:var(--tile-text);">(loading model...)</span>
+    </div>
+    <canvas id="pad-canvas" class="pad-canvas" width="280" height="200"></canvas>
+    <div class="pad-controls">
+      <div style="display:flex; gap:8px;">
+        <button id="pad-clear" class="small-btn" type="button">Clear</button>
+        <button id="pad-erase" class="small-btn" type="button">Eraser</button>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button id="pad-use" class="small-btn" type="button">Use as Answer</button>
+        <button id="pad-close" class="small-btn" type="button">Close</button>
+      </div>
+    </div>
+    <div style="font-size:12px; opacity:0.9;">Tip: draw a single digit 0–9. If recognition fails, you can clear and try again or type the answer.</div>
+  </div>
+
+  <!-- Load TF.js for digit recognition (loaded on demand if needed) -->
   <script>
     /* ===== Utilities & state ===== */
     const el = (id) => document.getElementById(id);
@@ -662,6 +716,216 @@
       questionStartTime = Date.now();
     }
 
+    /* ===== Handwriting pad & digit recognition (TF.js) ===== */
+    let tfModel = null;
+    let tfLoaded = false;
+    let modelLoading = false;
+    const modelUrl = 'https://storage.googleapis.com/learnjs-data/model-builder/mnist/model.json';
+
+    async function ensureModelLoaded() {
+      if (tfLoaded) return true;
+      if (modelLoading) return false; // already loading
+      modelLoading = true;
+      try {
+        // load TF.js runtime first
+        if (!window.tf) {
+          await new Promise((res, rej) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js';
+            s.onload = res; s.onerror = rej;
+            document.head.appendChild(s);
+          });
+        }
+        el('pad-status').innerText = '(loading model...)';
+        tfModel = await tf.loadLayersModel(modelUrl);
+        tfLoaded = true;
+        el('pad-status').innerText = '(ready)';
+        return true;
+      } catch (err) {
+        console.warn('TF model load failed', err);
+        el('pad-status').innerText = '(model unavailable)';
+        return false;
+      } finally {
+        modelLoading = false;
+      }
+    }
+
+    // Canvas drawing
+    const pad = el('handwriting-pad');
+    const padCanvas = el('pad-canvas');
+    const padCtx = padCanvas.getContext('2d');
+    let drawing = false;
+    let lastX = 0, lastY = 0;
+
+    function clearPad() {
+      padCtx.fillStyle = '#fff';
+      padCtx.fillRect(0,0,padCanvas.width,padCanvas.height);
+    }
+
+    function setEraser(active) {
+      if (active) {
+        padCtx.globalCompositeOperation = 'destination-out';
+        padCtx.lineWidth = 18;
+      } else {
+        padCtx.globalCompositeOperation = 'source-over';
+        padCtx.lineWidth = 14;
+        padCtx.strokeStyle = '#000';
+        padCtx.lineCap = 'round';
+        padCtx.lineJoin = 'round';
+      }
+    }
+
+    function getPointerPos(e) {
+      const rect = padCanvas.getBoundingClientRect();
+      const p = e.touches ? e.touches[0] : e;
+      return { x: (p.clientX - rect.left) * (padCanvas.width / rect.width), y: (p.clientY - rect.top) * (padCanvas.height / rect.height) };
+    }
+
+    function startDraw(e) {
+      e.preventDefault();
+      drawing = true;
+      const p = getPointerPos(e);
+      lastX = p.x; lastY = p.y;
+    }
+    function moveDraw(e) {
+      if (!drawing) return;
+      e.preventDefault();
+      const p = getPointerPos(e);
+      padCtx.beginPath();
+      padCtx.moveTo(lastX, lastY);
+      padCtx.lineTo(p.x, p.y);
+      padCtx.stroke();
+      lastX = p.x; lastY = p.y;
+    }
+    function endDraw(e) {
+      drawing = false;
+    }
+
+    // Hook pointer events (mouse & touch)
+    padCanvas.addEventListener('pointerdown', (e) => { padCanvas.setPointerCapture(e.pointerId); startDraw(e); });
+    padCanvas.addEventListener('pointermove', moveDraw);
+    padCanvas.addEventListener('pointerup', endDraw);
+    padCanvas.addEventListener('pointercancel', endDraw);
+
+    el('pad-clear').addEventListener('click', () => { setEraser(false); clearPad(); });
+    el('pad-erase').addEventListener('click', () => { setEraser(true); });
+    el('pad-close').addEventListener('click', closeHandwritingPad);
+
+    async function openHandwritingPad() {
+      pad.classList.add('show');
+      // initialize canvas
+      padCanvas.width = 280; padCanvas.height = 200;
+      padCtx.fillStyle = '#fff'; padCtx.fillRect(0,0,padCanvas.width,padCanvas.height);
+      setEraser(false);
+      el('pad-status').innerText = '(loading...)';
+      // try to load model in background
+      ensureModelLoaded().catch(()=>{});
+    }
+
+    function closeHandwritingPad() {
+      pad.classList.remove('show');
+    }
+
+    // Preprocess canvas to 28x28 and run prediction
+    function preprocessCanvasTo28(canvas) {
+      // Find bounding box of ink
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width, h = canvas.height;
+      const img = ctx.getImageData(0,0,w,h);
+      const data = img.data;
+      let minX=w, minY=h, maxX=0, maxY=0, found=false;
+      for (let y=0; y<h; y++) {
+        for (let x=0; x<w; x++) {
+          const idx = (y*w + x) * 4;
+          const alpha = data[idx+3];
+          // consider stroke if not white and alpha>10
+          if (alpha > 10 && !(data[idx]===255 && data[idx+1]===255 && data[idx+2]===255)) {
+            found = true;
+            if (x < minX) minX = x;
+            if (y < minY) minY = y;
+            if (x > maxX) maxX = x;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (!found) return null;
+      // expand box a bit
+      const padding = 8;
+      minX = Math.max(0, minX - padding);
+      minY = Math.max(0, minY - padding);
+      maxX = Math.min(w, maxX + padding);
+      maxY = Math.min(h, maxY + padding);
+      const boxW = maxX - minX; const boxH = maxY - minY;
+      // draw to offscreen 28x28
+      const off = document.createElement('canvas'); off.width = 28; off.height = 28;
+      const octx = off.getContext('2d');
+      // white background
+      octx.fillStyle = '#fff'; octx.fillRect(0,0,28,28);
+      // maintain aspect ratio
+      const scale = Math.min(20/boxW, 20/boxH); // leave margin for centering
+      const newW = boxW * scale; const newH = boxH * scale;
+      const dx = (28 - newW) / 2; const dy = (28 - newH) / 2;
+      octx.drawImage(canvas, minX, minY, boxW, boxH, dx, dy, newW, newH);
+      // invert colors to match MNIST (black background -> white strokes). Model expects 0..1 where 0 is background.
+      const img28 = octx.getImageData(0,0,28,28);
+      const out = new Float32Array(28*28);
+      for (let i=0;i<28*28;i++) {
+        const r = img28.data[i*4];
+        // assume white background (255) and dark stroke -> invert
+        out[i] = (255 - r) / 255.0;
+      }
+      return out;
+    }
+
+    async function recognizeDigit() {
+      if (!tfLoaded) {
+        const ok = await ensureModelLoaded();
+        if (!ok) return { digit: null, confidence: 0 };
+      }
+      const pixels = preprocessCanvasTo28(padCanvas);
+      if (!pixels) return { digit: null, confidence: 0 };
+      try {
+        const input = tf.tensor4d(pixels, [1,28,28,1]);
+        const preds = tfModel.predict(input);
+        const arr = await preds.data();
+        let maxIdx = 0; let maxV = arr[0];
+        for (let i=1;i<arr.length;i++) if (arr[i]>maxV) { maxV=arr[i]; maxIdx=i; }
+        input.dispose(); preds.dispose();
+        return { digit: maxIdx, confidence: maxV };
+      } catch (e) {
+        console.warn('recognize error', e);
+        return { digit: null, confidence:0 };
+      }
+    }
+
+    el('pad-use').addEventListener('click', async () => {
+      el('pad-status').innerText = '(recognizing...)';
+      const res = await recognizeDigit();
+      if (res.digit === null) {
+        el('pad-status').innerText = '(no strokes detected)';
+        setTimeout(()=> el('pad-status').innerText = '(ready)', 1000);
+        return;
+      }
+      el('pad-status').innerText = `(recognized ${res.digit} confidence ${Math.round(res.confidence*100)}%)`;
+      // set recognized digit into input; if problem answer may be multi-digit, append or replace
+      const input = el('answer-input');
+      // if confidence low, ask user to confirm
+      if (res.confidence < 0.45) {
+        if (!confirm(`Recognized '${res.digit}' with low confidence (${Math.round(res.confidence*100)}%). Use this as the answer?`)) {
+          el('pad-status').innerText = '(ready)';
+          return;
+        }
+      }
+      // append digit (so user can build multi-digit answers by repeated strokes)
+      input.value = String(input.value || '') + String(res.digit);
+      input.focus();
+      closeHandwritingPad();
+    });
+
+    // wire handwriting pad open button
+    el('open-pad-btn').addEventListener('click', openHandwritingPad);
+
+    /* ===== Rest of quiz logic (unchanged) ===== */
     function revealHint() {
       if (usedHint) return;
       usedHint = true;
