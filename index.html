@@ -9,12 +9,16 @@
 <body ontouchstart="dismissKeyboard(event)">
   <div class="app-container" id="app">
     <div class="header-menu">
-      <button class="menu-btn" id="menu-button" aria-haspopup="true" aria-expanded="false">🎨</button>
+      <button class="bg-toggle-btn" id="bg-toggle-btn" aria-haspopup="true" aria-expanded="false" title="Change background">🎨</button>
+      <div id="bg-dropdown" class="bg-dropdown" role="menu" aria-label="Background selector"></div>
+      
+      <button class="menu-btn" id="menu-button" aria-haspopup="true" aria-expanded="false">⚙️</button>
       <div id="theme-dropdown" class="dropdown-content" role="menu" aria-label="Theme and Admin menu">
         <button type="button" data-theme="default">🔵 Classic Blue</button>
         <button type="button" data-theme="sunset">🌅 Sunset Minimal</button>
         <button type="button" data-theme="forest">🌿 Forest Green</button>
         <button type="button" data-theme="dark">🌙 Deep Dark</button>
+        <button type="button" data-theme="minecraft">⛏️ Minecraft</button>
         <button class="admin-panel-item" id="open-admin" type="button">⚙️ Admin Setup</button>
       </div>
     </div>
@@ -69,6 +73,12 @@
       <h2>⚙️ Calibration Menu</h2>
       <div style="flex-grow: 1; overflow-y: auto; padding: 5px 2px;">
         <div class="admin-row"><strong>Feedback Hold (sec):</strong><input type="number" id="cfg-delay" class="admin-val" step="0.1" value="1.8"></div>
+        <hr style="border: 0; border-top: 1px dashed var(--tile-bg); margin: 12px 0;">
+        <p style="font-size: 13px; font-weight: bold; margin-bottom: 8px; opacity: 0.8;">Audio Settings:</p>
+        <div class="admin-row">
+          <label for="cfg-audio-toggle" style="flex-grow: 1;">Enable Minecraft Audio</label>
+          <input type="checkbox" id="cfg-audio-toggle" style="width: auto; margin-right: 10px;">
+        </div>
         <hr style="border: 0; border-top: 1px dashed var(--tile-bg); margin: 12px 0;">
         <p style="font-size: 13px; font-weight: bold; margin-bottom: 8px; opacity: 0.8;">Edit Rewards &amp; Targets:</p>
         <div class="admin-row"><input type="text" id="cfg-n1" class="admin-txt" value=""><input type="number" id="cfg-t1" class="admin-val" value="10"></div>
