@@ -45,6 +45,19 @@
   --tile-text: #ffffff;
 }
 
+[data-theme="minecraft"] {
+  --primary: #2d5016;
+  --success: #5fd381;
+  --danger: #e74c3c;
+  --warning: #f39c12;
+  --dark: #1a1a1a;
+  --light: #8b8b8b;
+  --card-bg: #3d3d3d;
+  --text-color: #ffffff;
+  --tile-bg: #4d4d4d;
+  --tile-text: #ffffff;
+}
+
 * {
   box-sizing: border-box;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -62,7 +75,24 @@ body {
   align-items: center;
   min-height: 100vh;
   padding: 15px;
-  /* allow scrolling on small screens */
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: var(--bg-image);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  z-index: -1;
 }
 
 .app-container {
@@ -78,11 +108,18 @@ body {
   flex-direction: column;
 }
 
+[data-theme="minecraft"] .app-container {
+  border: 4px solid #2d5016;
+  box-shadow: inset 0 0 0 2px #5fd381;
+}
+
 .header-menu {
   position: absolute;
   top: 20px;
   right: 20px;
   z-index: 100;
+  display: flex;
+  gap: 8px;
 }
 
 .menu-btn {
@@ -96,6 +133,27 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+[data-theme="minecraft"] .menu-btn {
+  border: 2px solid #2d5016;
+}
+
+.bg-toggle-btn {
+  background: var(--tile-bg);
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+[data-theme="minecraft"] .bg-toggle-btn {
+  border: 2px solid #2d5016;
 }
 
 .dropdown-content {
@@ -138,6 +196,42 @@ body {
   display: block;
 }
 
+.bg-dropdown {
+  display: none;
+  position: absolute;
+  right: 50px;
+  top: 42px;
+  background-color: var(--card-bg);
+  min-width: 200px;
+  box-shadow: 0px 8px 16px rgba(0,0,0,0.15);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--tile-bg);
+  z-index: 110;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.bg-dropdown button {
+  color: var(--text-color);
+  padding: 12px 16px;
+  display: block;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.bg-dropdown button:hover {
+  background-color: var(--tile-bg);
+}
+
+.bg-dropdown.show {
+  display: block;
+}
+
 .screen {
   display: none;
   flex-direction: column;
@@ -154,6 +248,12 @@ h2 {
   margin-bottom: 20px;
   font-size: 24px;
   color: var(--primary);
+}
+
+[data-theme="minecraft"] h2 {
+  font-family: 'Arial', sans-serif;
+  font-weight: bold;
+  text-shadow: 2px 2px 0px rgba(0,0,0,0.5);
 }
 
 .grid-container {
@@ -176,6 +276,10 @@ h2 {
   user-select: none;
 }
 
+[data-theme="minecraft"] .num-tile {
+  border: 2px solid #2d5016;
+}
+
 .num-tile[aria-pressed="true"] {
   background: var(--primary);
   color: white;
@@ -193,6 +297,10 @@ h2 {
   border-radius: 12px;
 }
 
+[data-theme="minecraft"] .stats-bar {
+  border: 2px solid #2d5016;
+}
+
 .quiz-flex-wrapper {
   display: flex;
   flex-direction: column;
@@ -206,6 +314,11 @@ h2 {
   text-align: center;
   margin: 15px 0;
   letter-spacing: 2px;
+}
+
+[data-theme="minecraft"] .problem-display {
+  font-family: 'Arial', sans-serif;
+  text-shadow: 2px 2px 0px rgba(0,0,0,0.5);
 }
 
 .input-wrapper {
@@ -329,6 +442,11 @@ button.action-btn {
   cursor: pointer;
   width: 100%;
   z-index: 10;
+}
+
+[data-theme="minecraft"] button.action-btn {
+  border: 3px solid #2d5016;
+  font-family: 'Arial', sans-serif;
 }
 
 @keyframes shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-10px); } 40%, 80% { transform: translateX(10px); } }
