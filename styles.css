@@ -116,7 +116,7 @@ body::before {
 .header-menu {
   position: absolute;
   top: 20px;
-  right: 20px;
+  left: 20px;
   z-index: 100;
   display: flex;
   gap: 8px;
@@ -159,8 +159,8 @@ body::before {
 .dropdown-content {
   display: none;
   position: absolute;
-  right: 0;
-  top: 42px;
+  left: 50px;
+  top: 0;
   background-color: var(--card-bg);
   min-width: 160px;
   box-shadow: 0px 8px 16px rgba(0,0,0,0.15);
@@ -199,10 +199,10 @@ body::before {
 .bg-dropdown {
   display: none;
   position: absolute;
-  right: 50px;
-  top: 42px;
+  left: 50px;
+  top: 0;
   background-color: var(--card-bg);
-  min-width: 200px;
+  min-width: 220px;
   box-shadow: 0px 8px 16px rgba(0,0,0,0.15);
   border-radius: 12px;
   overflow: hidden;
@@ -230,6 +230,32 @@ body::before {
 
 .bg-dropdown.show {
   display: block;
+}
+
+.bg-input-section {
+  padding: 12px 16px;
+  border-top: 1px dashed var(--tile-bg);
+}
+
+.bg-input-section input {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 8px;
+  border: 1px solid var(--tile-bg);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.bg-input-section button {
+  width: 100%;
+  padding: 8px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
 }
 
 .screen {
